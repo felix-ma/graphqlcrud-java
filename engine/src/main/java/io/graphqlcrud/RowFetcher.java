@@ -15,19 +15,14 @@
  */
 package io.graphqlcrud;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import graphql.language.Field;
+import graphql.schema.*;
+
 import java.sql.ResultSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import graphql.language.Field;
-import graphql.schema.DataFetcher;
-import graphql.schema.DataFetchingEnvironment;
-import graphql.schema.GraphQLFieldDefinition;
-import graphql.schema.GraphQLObjectType;
-import graphql.schema.GraphQLType;
 
 // This must be thread safe, as it will be called by multiple threads at same time
 public class RowFetcher implements DataFetcher<Object> {
@@ -71,7 +66,11 @@ public class RowFetcher implements DataFetcher<Object> {
         if (rs != null) {
             return rs.getObject(f.getName());
         } else {
-            return ((Map<?,?>)source).get(colName);
+            if (source instanceof Map) {
+                return ((Map<?, ?>) source).get(colName);
+            } else {
+                return null;
+            }
         }
     }
 }

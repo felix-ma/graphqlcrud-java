@@ -16,23 +16,6 @@
 package io.graphqlcrud.app;
 
 
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.Map;
-
-import javax.enterprise.event.Observes;
-import javax.inject.Inject;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-
-import io.quarkus.runtime.StartupEvent;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import graphql.ExecutionInput;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -43,6 +26,18 @@ import io.graphqlcrud.DatabaseSchemaBuilder;
 import io.graphqlcrud.GraphQLSchemaBuilder;
 import io.graphqlcrud.SQLContext;
 import io.graphqlcrud.model.Schema;
+import io.quarkus.runtime.StartupEvent;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.enterprise.event.Observes;
+import javax.inject.Inject;
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.Map;
 
 @Path("/graphql")
 @Produces(MediaType.APPLICATION_JSON)
@@ -63,13 +58,24 @@ public class GraphQLResource {
         this.dialect = dialect;
     }
 
-   
+
     void init(@Observes StartupEvent event) throws SQLException {
         try (Connection conn = this.datasource.getConnection()) {
             Schema dbSchema = DatabaseSchemaBuilder.getSchema(conn, this.dbSchemaName);
             this.schema = GraphQLSchemaBuilder.getSchema(dbSchema);
             SchemaPrinter sp = new SchemaPrinter();
             LOGGER.info(sp.print(this.schema));
+        }
+    }
+
+    @GET
+    public String refresh() throws SQLException {
+        try (Connection conn = this.datasource.getConnection()) {
+            Schema dbSchema = DatabaseSchemaBuilder.getSchema(conn, this.dbSchemaName);
+            this.schema = GraphQLSchemaBuilder.getSchema(dbSchema);
+            SchemaPrinter sp = new SchemaPrinter();
+            LOGGER.info(sp.print(this.schema));
+            return sp.print(this.schema);
         }
     }
 

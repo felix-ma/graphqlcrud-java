@@ -15,37 +15,21 @@
  */
 package io.graphqlcrud;
 
-import static org.jooq.impl.DSL.field;
-import static org.jooq.impl.DSL.jsonEntry;
-import static org.jooq.impl.DSL.jsonObject;
-import static org.jooq.impl.DSL.jsonbArrayAgg;
-import static org.jooq.impl.DSL.name;
-import static org.jooq.impl.DSL.table;
-import static org.jooq.impl.DSL.val;
+import graphql.Scalars;
+import graphql.language.Field;
+import graphql.language.*;
+import graphql.schema.*;
+import io.graphqlcrud.FilterScanner.Clause;
+import org.jooq.*;
+import org.jooq.impl.DSL;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import graphql.Scalars;
-import graphql.schema.*;
-import org.jooq.Condition;
-import org.jooq.DSLContext;
-import org.jooq.JSONEntry;
-import org.jooq.Record;
-import org.jooq.SQLDialect;
-import org.jooq.SelectSelectStep;
-import org.jooq.impl.DSL;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import graphql.language.Argument;
-import graphql.language.Field;
-import graphql.language.IntValue;
-import graphql.language.ObjectField;
-import graphql.language.ObjectValue;
-import graphql.language.Value;
-import io.graphqlcrud.FilterScanner.Clause;
+import static org.jooq.impl.DSL.*;
 
 /**
  * This is root SQL builder, it is assumed any special cases are added as extensions to this class by extending it
@@ -131,7 +115,7 @@ public class SQLQueryBuilderVisitor implements QueryVisitor{
             Condition where = null;
             for (int key = 0; key < sqlDirective.getPrimaryFields().size(); key++) {
                 Condition cond = field(name(aliasLeft, sqlDirective.getPrimaryFields().get(key)))
-                        .eq(field(name(sqlDirective.getForeignFields().get(key))));
+                        .eq(field(name(aliasRight, sqlDirective.getForeignFields().get(key))));
                 if (key == 0) {
                     where = cond;
                 } else {
@@ -157,8 +141,7 @@ public class SQLQueryBuilderVisitor implements QueryVisitor{
         VisitorContext vctx = this.stack.pop();
 
         SelectSelectStep<Record> select = this.create.select();
-        select.from(vctx.table.name);
-
+        select.from(table(vctx.table.name).as(vctx.table.alias));
         // add orderby
         if (vctx.orderby == null) {
             List<String> identityColumns = getIdentityColumns(type);
@@ -333,6 +316,7 @@ public class SQLQueryBuilderVisitor implements QueryVisitor{
             vctx.page = p;
         } else if (argName.equals("orderBy")) {
             // handle orderBy
+            LOGGER.debug("Walk through orderBy");
         } else if(argName.equals("filter")) {
             LOGGER.debug("Walk through filter results");
             FilterScanner<Condition> filterScanner = new FilterScanner<>(filterBuilder);
@@ -377,7 +361,9 @@ public class SQLQueryBuilderVisitor implements QueryVisitor{
             if (vctx.condition == null) {
                 vctx.condition = condition;
             } else {
-                vctx.condition = filterBuilder.and(vctx.condition, condition);
+                if (condition != null) {
+                    vctx.condition = filterBuilder.and(vctx.condition, condition);
+                }
             }
         }
     }
