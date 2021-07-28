@@ -17,13 +17,15 @@ package io.graphqlcrud.model;
 
 public class Attribute {
     private final String name;
+    private final String description;
     private final boolean isNullable;
     private final int type;
 
-    public Attribute(String name, int type, boolean isNullable) {
+    public Attribute(String name, int type, boolean isNullable, String description) {
         this.name = name;
         this.type = type;
         this.isNullable = isNullable;
+        this.description = description;
     }
 
     public boolean isNullable() {
@@ -32,6 +34,10 @@ public class Attribute {
 
     public String getName() {
         return name;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public int getType() {

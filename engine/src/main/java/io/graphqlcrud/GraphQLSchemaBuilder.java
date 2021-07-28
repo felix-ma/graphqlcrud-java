@@ -15,21 +15,20 @@
  */
 package io.graphqlcrud;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import graphql.schema.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import graphql.Scalars;
 import graphql.language.OperationTypeDefinition;
 import graphql.language.SchemaDefinition;
 import graphql.language.TypeName;
+import graphql.schema.*;
 import graphql.schema.GraphQLObjectType.Builder;
 import io.graphqlcrud.model.Entity;
 import io.graphqlcrud.model.Schema;
 import io.graphqlcrud.types.JdbcTypeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GraphQLSchemaBuilder {
 
@@ -64,11 +63,12 @@ public class GraphQLSchemaBuilder {
         builder.additionalType(Filters.orderByInputBuilder().build());
 
         //add FilterInputTypes
-        schema.getEntities().stream().forEach(filterEntity -> {
-            GraphQLInputObjectType.Builder  entityBuilder = GraphQLInputObjectType.newInputObject();
+        schema.getEntities().forEach(filterEntity -> {
+            GraphQLInputObjectType.Builder entityBuilder = GraphQLInputObjectType.newInputObject();
             String filterName = StringUtil.capitalize(filterEntity.getName().toLowerCase()) + "FilterInput";
             entityBuilder.name(filterName);
-            buildFilterFields(filterEntity).stream().forEach(filter -> {
+            entityBuilder.description("Filter" + filterEntity.getDescription());
+            buildFilterFields(filterEntity).forEach(filter -> {
                 entityBuilder.field(filter.build());
                 entityBuilder.field(GraphQLInputObjectField.newInputObjectField().name("not").type(GraphQLTypeReference.typeRef(filterName)));
                 entityBuilder.field(GraphQLInputObjectField.newInputObjectField().name("and").type(GraphQLList.list(GraphQLTypeReference.typeRef(filterName))));
@@ -84,6 +84,7 @@ public class GraphQLSchemaBuilder {
             GraphQLInputObjectType.Builder mutationBuilder = GraphQLInputObjectType.newInputObject();
             String name = "Mutate" + StringUtil.capitalize(mutation.getName().toLowerCase()) + "Input";
             mutationBuilder.name(name);
+            mutationBuilder.description("Mutate" + mutation.getDescription());
             buildMutations(mutation, codeBuilder).forEach(updateField -> {
                 mutationBuilder.field(updateField.build());
             });
@@ -102,14 +103,14 @@ public class GraphQLSchemaBuilder {
 
         builder.mutation(mutationTypeBuilder.build());
 
-        schema.getEntities().stream().forEach(entity -> {
+        schema.getEntities().forEach(entity -> {
             GraphQLObjectType.Builder typeBuilder = GraphQLObjectType.newObject();
-            typeBuilder.description(entity.getDescription());
             typeBuilder.name(entity.getName());
+            typeBuilder.description(entity.getDescription());
             typeBuilder.withDirective(SQLDirective.newDirective().tableName(entity.getFullName()).build());
 
             // Add fields in a Type
-            buildTypeFields(entity, schema, codeBuilder).stream().forEach(fieldBuilder -> {
+            buildTypeFields(entity, schema, codeBuilder).forEach(fieldBuilder -> {
                 typeBuilder.field(fieldBuilder.build());
             });
 
@@ -130,6 +131,7 @@ public class GraphQLSchemaBuilder {
         schemaDefinitionBuilder.operationTypeDefinition(opBuilder.build());
         builder.definition(schemaDefinitionBuilder.build());
 
+        // custom graphql directive
         builder.additionalDirectives(SQLDirective.addDirectiveToSchema("sql"));
 
         builder.codeRegistry(codeBuilder.build());
@@ -139,18 +141,17 @@ public class GraphQLSchemaBuilder {
 
     private void addMutationForEntity(Entity entity, Builder mutationTypeBuilder, String name, GraphQLCodeRegistry.Builder codeBuilder) {
         String argumentType;
-        String fieldName;
+        String fieldName = name + StringUtil.capitalize(entity.getName().toLowerCase());
+        String description = name + entity.getDescription();
         GraphQLFieldDefinition.Builder field = GraphQLFieldDefinition.newFieldDefinition();
 
         switch (name) {
             case "create":
-                fieldName = "create" + StringUtil.capitalize(entity.getName().toLowerCase());
                 argumentType = "Mutate" + StringUtil.capitalize(entity.getName().toLowerCase()) + "Input";
                 field.argument(GraphQLArgument.newArgument().name("input").type(GraphQLNonNull.nonNull(new GraphQLTypeReference(argumentType))).build());
                 field.type(new GraphQLTypeReference(entity.getName()));
                 break;
             case "update":
-                fieldName = "update" + StringUtil.capitalize(entity.getName().toLowerCase());
                 argumentType = "Mutate" + StringUtil.capitalize(entity.getName().toLowerCase()) + "Input";
                 String conditionalUpdate = StringUtil.capitalize(entity.getName().toLowerCase()) + "FilterInput";
                 field.argument(GraphQLArgument.newArgument().name("filter").type(new GraphQLTypeReference(conditionalUpdate)).build());
@@ -159,7 +160,6 @@ public class GraphQLSchemaBuilder {
 
                 break;
             case "delete":
-                fieldName = "delete" + StringUtil.capitalize(entity.getName().toLowerCase());
                 argumentType = StringUtil.capitalize(entity.getName().toLowerCase()) + "FilterInput";
                 field.argument(GraphQLArgument.newArgument().name("filter").type(GraphQLNonNull.nonNull(new GraphQLTypeReference(argumentType))).build());
                 field.type(GraphQLList.list(new GraphQLTypeReference(entity.getName())));
@@ -169,6 +169,7 @@ public class GraphQLSchemaBuilder {
         }
 
         field.name(fieldName);
+        field.description(description);
         mutationTypeBuilder.field(field.build());
         codeBuilder.dataFetcher(FieldCoordinates.coordinates("MutationType", fieldName), DEFAULT_DATA_FETCHER_FACTORY);
     }
@@ -179,6 +180,7 @@ public class GraphQLSchemaBuilder {
             String name = StringUtil.plural(entity.getName()).toLowerCase();
             GraphQLFieldDefinition.Builder builder = GraphQLFieldDefinition.newFieldDefinition();
             builder.name(name);
+            builder.description("FindAll" + entity.getDescription());
             builder.argument(GraphQLArgument.newArgument().name("page").type(GraphQLTypeReference.typeRef("PageRequest")).build());
             builder.argument(GraphQLArgument.newArgument().name("filter").type(GraphQLTypeReference.typeRef(StringUtil.capitalize(entity.getName().toLowerCase()) + "FilterInput")).build());
             builder.argument(GraphQLArgument.newArgument().name("orderBy").type(GraphQLTypeReference.typeRef("OrderByInput")).build());
@@ -193,6 +195,7 @@ public class GraphQLSchemaBuilder {
                 String name = entity.getName().toLowerCase();
                 GraphQLFieldDefinition.Builder builder = GraphQLFieldDefinition.newFieldDefinition();
                 builder.name(name);
+                builder.description("FindOne" + entity.getDescription());
                 builder.type(new GraphQLTypeReference(entity.getName()));
                 entity.getPrimaryKeys().stream().forEach(str -> {
                     GraphQLArgument.Builder argument = GraphQLArgument.newArgument();
@@ -213,6 +216,7 @@ public class GraphQLSchemaBuilder {
         entity.getAttributes().stream().forEach(attr -> {
             GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition();
             fieldBuilder.name(attr.getName());
+            fieldBuilder.description(attr.getDescription());
             if (entity.isPartOfPrimaryKey(attr.getName())) {
                 fieldBuilder.type(GraphQLNonNull.nonNull(Scalars.GraphQLID));
             } else {
@@ -227,15 +231,15 @@ public class GraphQLSchemaBuilder {
         });
 
         // build fields based on relationships which reference to other types
-        schema.getEntities().stream().forEach(e -> {
-            e.getRelations().stream().forEach(relation -> {
+        schema.getEntities().forEach(e -> {
+            e.getRelations().forEach(relation -> {
                 if (relation.getForeignEntity().getName().equals(entity.getName())) {
                     GraphQLFieldDefinition.Builder fieldBuilder = GraphQLFieldDefinition.newFieldDefinition();
                     fieldBuilder.name(relation.getName());
-                    if(relation.isExportedKey()) {
+                    fieldBuilder.description(relation.getDescription());
+                    if (relation.isExportedKey()) {
                         fieldBuilder.type(new GraphQLTypeReference(e.getName()));
-                    }
-                    else {
+                    } else {
                         fieldBuilder.argument(GraphQLArgument.newArgument().name("page").type(GraphQLTypeReference.typeRef("PageRequest")).build());
                         fieldBuilder.argument(GraphQLArgument.newArgument().name("filter").type(GraphQLTypeReference.typeRef(StringUtil.capitalize(e.getName().toLowerCase()) + "FilterInput")).build());
                         fieldBuilder.argument(GraphQLArgument.newArgument().name("orderBy").type(GraphQLTypeReference.typeRef("OrderByInput")).build());
@@ -262,6 +266,7 @@ public class GraphQLSchemaBuilder {
         filterEntity.getAttributes().stream().forEach(attr -> {
             GraphQLInputObjectField.Builder builder = GraphQLInputObjectField.newInputObjectField();
             builder.name(attr.getName());
+            builder.description(attr.getDescription());
             builder.type(TYPE_MAP.getAsGraphQLFilterType(attr.getType()));
             filterFields.add(builder);
         });
@@ -274,6 +279,7 @@ public class GraphQLSchemaBuilder {
         mutationEntity.getAttributes().forEach(attribute -> {
             GraphQLInputObjectField.Builder builder = GraphQLInputObjectField.newInputObjectField();
             builder.name(attribute.getName());
+            builder.description(attribute.getDescription());
             if (mutationEntity.isPartOfPrimaryKey(attribute.getName())) {
                 builder.type(Scalars.GraphQLID);
             } else {

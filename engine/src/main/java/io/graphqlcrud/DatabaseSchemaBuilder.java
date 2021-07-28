@@ -15,24 +15,15 @@
  */
 package io.graphqlcrud;
 
+import io.graphqlcrud.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import io.graphqlcrud.model.Attribute;
-import io.graphqlcrud.model.Cardinality;
-import io.graphqlcrud.model.Entity;
-import io.graphqlcrud.model.Relation;
-import io.graphqlcrud.model.Schema;
+import java.util.*;
 
 public class DatabaseSchemaBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseSchemaBuilder.class);
@@ -56,10 +47,12 @@ public class DatabaseSchemaBuilder {
                 new String[] { "TABLE", "VIEW" })) {
             while (results.next()) {
                 String tableName = results.getString("TABLE_NAME");
+                String description = results.getString("REMARKS");
                 if (tableName.equals("flyway_schema_history")) {
                     continue;
                 }
                 Entity entity = buildEntity(tableName);
+                entity.setDescription(description);
                 entity.setParent(s);
                 entityMap.put(tableName, entity);
                 LOGGER.debug(entity.toString());
@@ -92,8 +85,9 @@ public class DatabaseSchemaBuilder {
                 String name = results.getString("COLUMN_NAME");
                 int dataType = results.getInt("DATA_TYPE");
                 boolean isNullable = results.getInt("NULLABLE") == 1;
+                String description = results.getString("REMARKS");
 
-                Attribute attribute = new Attribute(name, dataType, isNullable);
+                Attribute attribute = new Attribute(name, dataType, isNullable, description);
                 entity.addAttribute(attribute);
             }
         }
@@ -155,6 +149,7 @@ public class DatabaseSchemaBuilder {
                     key.setForeignEntity(fkEntity);
                     allRelations.put(fkTable, key);
                 }
+                key.setDescription(fkEntity.getDescription());
                 key.getKeyColumns().put(seqNumber, fkColumn);
                 key.getReferencedKeyColumns().put(seqNumber, pkColumn);
                 key.setExportedKey(true);
@@ -165,6 +160,7 @@ public class DatabaseSchemaBuilder {
                     key.setForeignEntity(pkEntity);
                     allRelations.put(pkTable, key);
                 }
+                key.setDescription(pkEntity.getDescription());
                 key.getKeyColumns().put(seqNumber, pkColumn);
                 key.getReferencedKeyColumns().put(seqNumber, fkColumn);
             }

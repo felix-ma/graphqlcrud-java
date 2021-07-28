@@ -60,12 +60,7 @@ public class GraphQLResource {
 
 
     void init(@Observes StartupEvent event) throws SQLException {
-        try (Connection conn = this.datasource.getConnection()) {
-            Schema dbSchema = DatabaseSchemaBuilder.getSchema(conn, this.dbSchemaName);
-            this.schema = GraphQLSchemaBuilder.getSchema(dbSchema);
-            SchemaPrinter sp = new SchemaPrinter();
-            LOGGER.info(sp.print(this.schema));
-        }
+        refresh();
     }
 
     @GET

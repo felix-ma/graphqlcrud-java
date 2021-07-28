@@ -23,6 +23,7 @@ import java.util.TreeMap;
 
 public class Entity implements Comparable<Entity>{
     private String name;
+    private String description;
     private Map<String, Attribute> attributes = new TreeMap<>();
     private List<Relation> relations = new ArrayList<Relation>();
     private List<String> pks = new ArrayList<>();
@@ -44,9 +45,12 @@ public class Entity implements Comparable<Entity>{
         return this.name;
     }
 
-    // TODO: this needs to built for GraphQLCRUD
     public String getDescription() {
-        return null;
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public List<Attribute> getAttributes() {

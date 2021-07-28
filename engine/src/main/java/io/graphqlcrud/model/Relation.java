@@ -20,6 +20,7 @@ import java.util.TreeMap;
 
 public class Relation {
     private String name;
+    private String description;
     private Entity foreignEntity;
     private TreeMap<Short, String> keyColumns = new TreeMap<Short, String>();
     private TreeMap<Short, String> referencedKeyColumns = new TreeMap<Short, String>();
@@ -37,6 +38,14 @@ public class Relation {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Entity getForeignEntity() {
